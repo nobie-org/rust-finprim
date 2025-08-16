@@ -35,7 +35,7 @@ use rust_decimal::prelude::*;
 /// fv(rate, nper, pmt, None, None);
 /// ```
 /// Internal FV calculation with mathematically correct signs
-fn fv_internal(rate: Decimal, nper: Decimal, pmt: Decimal, pv: Option<Decimal>, due: Option<bool>) -> Decimal {
+pub fn fv_internal(rate: Decimal, nper: Decimal, pmt: Decimal, pv: Option<Decimal>, due: Option<bool>) -> Decimal {
     let pv = pv.unwrap_or(ZERO);
     let due = due.unwrap_or(false);
 

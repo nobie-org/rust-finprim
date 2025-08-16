@@ -7,7 +7,7 @@
 
 // FV - Future Value
 mod fv;
-pub use fv::fv;
+pub use fv::{fv, fv_internal};
 
 // PV - Present Value
 mod pv;
