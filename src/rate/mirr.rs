@@ -1,5 +1,5 @@
 use crate::rate::cagr;
-use crate::tvm::{fv, pv};
+use crate::tvm::{fv_internal, pv};
 use crate::ZERO;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::*;
@@ -44,7 +44,7 @@ pub fn mirr(cash_flows: &[Decimal], finance_rate: Decimal, reinvest_rate: Decima
             npv_neg += pv(finance_rate, i.into(), ZERO, Some(cf), None);
         } else {
             // Calculate the future value of positive cash flows
-            fv_pos += fv(reinvest_rate, (n - i).into(), ZERO, Some(cf), None);
+            fv_pos += fv_internal(reinvest_rate, (n - i).into(), ZERO, Some(cf), None);
         }
     }
     npv_neg.set_sign_positive(true);
@@ -112,7 +112,7 @@ pub fn xmirr(flow_table: &[(Decimal, i32)], finance_rate: Decimal, reinvest_rate
                 None,
             );
         } else {
-            fv_pos += fv(
+            fv_pos += fv_internal(
                 reinvest_rate,
                 (n - Decimal::from_i32(date).unwrap()) / dec!(365),
                 ZERO,
