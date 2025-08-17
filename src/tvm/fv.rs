@@ -34,7 +34,8 @@ use rust_decimal::prelude::*;
 /// let rate = dec!(0.05); let nper = dec!(10); let pmt = dec!(-100);
 /// fv(rate, nper, pmt, None, None);
 /// ```
-pub fn fv(rate: Decimal, nper: Decimal, pmt: Decimal, pv: Option<Decimal>, due: Option<bool>) -> Decimal {
+/// Internal FV calculation with mathematically correct signs
+pub fn fv_internal(rate: Decimal, nper: Decimal, pmt: Decimal, pv: Option<Decimal>, due: Option<bool>) -> Decimal {
     let pv = pv.unwrap_or(ZERO);
     let due = due.unwrap_or(false);
 
@@ -44,7 +45,7 @@ pub fn fv(rate: Decimal, nper: Decimal, pmt: Decimal, pv: Option<Decimal>, due: 
     }
 
     let nth_power = (ONE + rate).powd(nper);
-    let factor = (ONE - nth_power) / rate;
+    let factor = (nth_power - ONE) / rate;
     let pv_grown = pv * nth_power;
 
     if due {
@@ -52,6 +53,30 @@ pub fn fv(rate: Decimal, nper: Decimal, pmt: Decimal, pv: Option<Decimal>, due: 
     } else {
         pmt * factor + pv_grown
     }
+}
+
+/// FV - Future Value (Excel-compatible)
+///
+/// Excel-compatible FV function that matches Excel's sign convention.
+/// In Excel, the result represents the future value you'll receive (typically positive
+/// when you make payments/investments).
+///
+/// # Arguments
+/// * `rate` - The interest rate per period
+/// * `nper` - The number of compounding periods
+/// * `pmt` - The payment amount per period
+/// * `pv` (optional) - The present value, default is 0
+/// * `due` (optional) - The timing of the payment (false = end of period, true = beginning of period), default is false
+///
+/// # Returns
+/// * The future value (FV) using Excel's sign convention
+pub fn fv(rate: Decimal, nper: Decimal, pmt: Decimal, pv: Option<Decimal>, due: Option<bool>) -> Decimal {
+    // Calculate the mathematically correct result
+    let result = fv_internal(rate, nper, pmt, pv, due);
+
+    // Excel uses a sign convention where the result is negated to represent
+    // the future value you'll receive rather than the mathematical cash flow result
+    -result
 }
 
 #[cfg(test)]
@@ -105,7 +130,7 @@ mod tests {
                 -100.0,
                 None,
                 None,
-                1257.78925,
+                -1257.78925,
                 "Standard case with 5% rate, 10 periods, and $100 pmt",
             ),
             TestCase::new(
@@ -114,7 +139,7 @@ mod tests {
                 -100.0,
                 None,
                 Some(true),
-                1320.67872,
+                -1320.67872,
                 "Payment at the beg of period should result in higher future value",
             ),
             TestCase::new(0.0, 10.0, -100.0, None, None, -1000.0, "Zero interest rate no growth"),
@@ -124,13 +149,25 @@ mod tests {
                 -100.0,
                 Some(1000.0),
                 None,
-                2886.68388,
+                371.10537,
                 "Initial investment should result in higher future value",
+            ),
+            // Microsoft Excel example: FV(0.06/12, 10, -200, -500, 1) = $2,581.40
+            // But mathematically it should be -2581.40 (negative because both pmt and pv are negative)
+            // Excel uses a different sign convention where the result is negated
+            TestCase::new(
+                0.06 / 12.0,
+                10.0,
+                -200.0,
+                Some(-500.0),
+                Some(true),
+                -2581.4033741,
+                "Microsoft Excel example: FV(0.06/12, 10, -200, -500, 1) - mathematically correct result",
             ),
         ];
 
         for case in &cases {
-            let calculated_fv = fv(case.rate, case.nper, case.pmt, case.pv, case.due);
+            let calculated_fv = fv_internal(case.rate, case.nper, case.pmt, case.pv, case.due);
             assert!(
                 (calculated_fv - case.expected).abs() < dec!(1e-5),
                 "Failed on case: {}. Expected {}, got {}",
@@ -139,5 +176,46 @@ mod tests {
                 calculated_fv
             );
         }
+    }
+
+    #[test]
+    fn test_fv_excel_compatible() {
+        // Test Excel-compatible FV function with Microsoft Excel examples
+
+        // Microsoft Example 1: FV(0.06/12, 10, -200, -500, 1) = $2,581.40
+        let result1 = fv(
+            Decimal::from_f64(0.06 / 12.0).unwrap(),
+            Decimal::from_f64(10.0).unwrap(),
+            Decimal::from_f64(-200.0).unwrap(),
+            Some(Decimal::from_f64(-500.0).unwrap()),
+            Some(true),
+        );
+        assert!(
+            (result1 - dec!(2581.40)).abs() < dec!(0.01),
+            "Microsoft Example 1 failed. Expected 2581.40, got {}",
+            result1
+        );
+
+        // Microsoft Example 2: FV(0.12/12, 12, -1000) = $12,682.50
+        let result2 = fv(
+            Decimal::from_f64(0.12 / 12.0).unwrap(),
+            Decimal::from_f64(12.0).unwrap(),
+            Decimal::from_f64(-1000.0).unwrap(),
+            None,
+            None,
+        );
+        assert!(
+            (result2 - dec!(12682.50)).abs() < dec!(0.01),
+            "Microsoft Example 2 failed. Expected 12682.50, got {}",
+            result2
+        );
+
+        // Standard case: FV(0.05, 10, -100) should be positive
+        let result3 = fv(dec!(0.05), dec!(10), dec!(-100), None, None);
+        assert!(
+            (result3 - dec!(1257.78925)).abs() < dec!(0.01),
+            "Standard case failed. Expected 1257.78925, got {}",
+            result3
+        );
     }
 }
