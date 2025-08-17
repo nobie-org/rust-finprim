@@ -14,6 +14,13 @@ Some functions and their args mimic those found in Excel and Google Sheets.
 - [Features](#features)
 - [Installation](#installation)
 
+## NOBIE INFO
+
+- Add upstream via `git remote add daneski13 https://github.com/daneski13/rust-finprim.git` and periodically rebase to a stable release
+- Turn `[PATCH]` commits into upstream PRs
+- Reference this repo's `master` using exact SHA
+- For local dev, use `rust_finprim = { path = "YOUR_PATH_TO_RUST_FINPRIM" }` in `nobie`
+
 ## Functionality
 
 ### Time Value of Money (TVM) Calculations
